@@ -1,6 +1,6 @@
 import { from, Observable } from 'rxjs';
-import { AfterViewInit, Component, OnInit } from '@angular/core';
-import { AcNotification, ActionType, ViewerConfiguration } from 'angular-cesium';
+import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
+import { AcNotification, ActionType, ViewerConfiguration, AcMapComponent } from 'angular-cesium';
 import { map } from 'rxjs/operators';
 
 @Component({
@@ -37,7 +37,9 @@ export class BoxesLayerComponent implements OnInit {
 
   boxDimensions = new Cesium.Cartesian3(800000, 800000, 800000);
   boxes$: Observable<AcNotification>;
-  Cesium = Cesium; 
+  Cesium = Cesium;
+
+  @ViewChild(AcMapComponent, {static: false}) map: AcMapComponent;
 
   constructor(viewerConf: ViewerConfiguration) {
                     viewerConf.viewerOptions = {
@@ -59,12 +61,44 @@ export class BoxesLayerComponent implements OnInit {
                   }),
                   };
   }
+  // tslint:disable-next-line: typedef
   ngOnInit() {
     this.boxes$ = from(this.entities).pipe(map(entity => ({
           id: entity.id,
           actionType: ActionType.ADD_UPDATE,
-          entity: entity,
+          entity
         }
     )));
+  }
+
+  // tslint:disable-next-line: use-lifecycle-interface
+  ngAfterViewInit(): void {
+    const viewer = this.map.getCesiumService().getViewer();
+    viewer.scene.globe.show = false;
+
+    const tileset = new Cesium.Cesium3DTileset({
+      url: 'http://test.blastreport.cl:8585/20200703_Esperanza_Cesium/Scene/20200703_Esperanza_Cesium.json',
+      maximumScreenSpaceError: 2,
+      maximumNumberOfLoadedTiles: 100000
+    });
+
+    tileset.readyPromise
+    // tslint:disable-next-line: only-arrow-functions
+    .then(function(tileset: { boundingSphere: { radius: number; }; }) {
+      viewer.scene.primitives.add(tileset);
+      viewer.zoomTo(
+        tileset,
+        new Cesium.HeadingPitchRange(
+          0.0,
+          -0.5,
+          tileset.boundingSphere.radius * 2.0
+        )
+      );
+    })
+    // tslint:disable-next-line: only-arrow-functions
+    .otherwise(function(error: any) {
+      console.log(error);
+    });
+
   }
 }
